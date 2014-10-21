@@ -1,8 +1,0 @@
-; $Id$
-name = faze_quiz_course
-description = A module that mange the courses and hierarchy of question for faze quiz module.
-core = 6.x
-package = Faze
-dependencies[] = faze_quiz
-dependencies[] = faze_jquery
-dependencies[] = faze_query_building
