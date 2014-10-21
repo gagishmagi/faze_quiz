@@ -1,0 +1,20 @@
+.block-faze_quiz_course table{
+  border-collapse:separate;
+  border-spacing:3px 3px;
+}
+
+.block-faze_quiz_course table,
+.block-faze_quiz_course table td,
+.block-faze_quiz_course table th 
+{
+  border: 1px solid black;
+  
+}
+
+.block-faze_quiz_course table th,
+.block-faze_quiz_course table td
+{
+  padding:5px;
+
+}
+

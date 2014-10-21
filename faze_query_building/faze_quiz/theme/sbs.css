@@ -1,0 +1,139 @@
+h1.title, div.breadcrumb, .fieldset_question>legend{
+  display: none;  
+}
+
+#content{
+  border: 3px solid #257FA1;
+  border-radius: 20px;
+  margin:10px;
+  background: #ffffff;
+}
+
+#faze-quiz-quiz-form #break_msg, #faze-quiz-quiz-form fieldset {
+  min-height:200px;
+}
+
+#content .section{
+  margin:10px;
+}
+
+#content-area{
+  margin: 5px 10px;
+  border-top: 3px solid #257FA1;  
+}
+
+
+#content .section.quizBreak input, #content .section.quizBreak button{
+  
+}
+
+#quiz_header{
+  overflow: hidden;
+  padding:10px;
+}
+
+#question_num{
+  float:right;
+  color:#18779B;
+}
+
+#timer{
+  float:left;
+  text-align:center;
+}
+
+#timer p{
+  margin:0;
+}
+
+#timer #left_time{
+  background: #006991;
+  color: #ECF4F7;
+  padding:3px;
+  border-radius: 5px;  
+}
+
+
+.fieldset_question{
+  border: none; 
+}
+
+#break{
+  position: relative;
+  float: left;
+  left: 10px;
+  top: 30px;
+}
+
+#break button{
+  background-image: url("image/break_bg.png");
+  background-color: transparent;
+  border-radius: 0;
+  width:60px;
+  height:60px;
+  border: 0 none;
+  
+}
+
+.quizBreak #break button{
+  background-position: 0 -77px;
+}
+
+#edit-submit {
+    float: left;
+    left: -50px;
+    position: relative;
+    top: 90px;
+    border: 0 none;
+    border-radius: 8px 8px 8px 8px;
+    cursor: pointer;
+	height: 50px;
+	width: 100px;
+	font-size:18px;
+    margin: 0;
+    padding: 0 5px;
+    background-color: #14FF14;
+}
+
+#sbs-navigation {
+  text-align:center;  
+}
+
+#sbs-navigation .sbs-nav-button{
+  background-image: url("image/navigation_gradient.png");
+  background-repeat: repeat-x;
+  color: #52565A;
+  height:22px;
+  line-height:20px;
+  border: 1px solid #818182;
+  border-radius: 0;  
+}
+
+#sbs-navigation .sbs-nav-button#sbs-prev-but{
+  border-radius: 0 20px 20px 0;  
+}
+
+#sbs-navigation .sbs-nav-button#sbs-next-but{
+  border-radius: 20px 0 0 20px; 
+}
+
+#sbs-navigation .sbs-nav-button.validStep{
+  background: #F0F014;
+  color: #575758;
+  text-decoration: line-through; 
+}
+
+#sbs-navigation .sbs-nav-button.notValidStep{
+  background: #F9F9FA;
+  color: #575758;
+}
+
+#sbs-navigation .sbs-nav-button.validStep.showStep{
+  background: #222222;
+  color: #898989;
+}
+
+#sbs-navigation .sbs-nav-button.notValidStep.showStep{
+  background: #222222;
+  color: #898989;
+}

@@ -1,0 +1,26 @@
+.full_question{
+  display:none;
+}
+
+#query_building-filter table{
+  width: 100%;
+}
+
+#question_table{
+  width: 100%;
+}
+
+#question_table td{
+  padding: 3px; 
+}
+
+#question_table .question_subject li{
+  list-style: none outside none;
+  display: inline;
+  margin: 4px 4px;
+  padding: 0 4px;
+  background: yellow;  
+}
+#question_table .question_subject li a{
+  font-weight: normal;
+}

@@ -1,0 +1,5 @@
+; $Id$
+name = faze_quiz
+description = A module that mange a quizes.
+core = 6.x
+package = Faze

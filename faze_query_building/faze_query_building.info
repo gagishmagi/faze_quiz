@@ -1,0 +1,6 @@
+; $Id$
+name = faze_query_building
+description = module that help build a interactive query.
+core = 6.x
+package = Faze
+

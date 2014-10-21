@@ -1,0 +1,800 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Main module file for faze_quiz.
+ */
+
+
+
+global $faze_quiz_question_vid;
+$faze_quiz_question_vid= 1; //the vid of the question taxonomy.
+global $faze_quiz_num_question;
+$faze_quiz_num_question=12;
+global $faze_quiz_defult_num_question;
+$faze_quiz_defult_num_question=12;
+
+/**
+ * Implemrntaion of hook_perm().
+ *
+ * This function tak 0 argument, and returns an array of permissions
+ * defined by our module. Our permissions are automatically mode available
+ * under admin/user/permissions.
+ */
+function faze_quiz_perm() {
+  return array('add quiz','manage quiz','manage question');
+}
+
+/**
+ * Implemrntaion of hook_menu().
+ *
+ * Hook menu registerspage callbacks with Drupal's central menu.
+ */
+function faze_quiz_menu(){
+
+  $items = array();
+
+  $items['admin/settings/faze_quiz']=array(  //the url of the page
+    'title' => 'Faze quiz',
+  	'page callback' => 'faze_quiz_admin_page', // the name of the function that run
+	'access callback' => 'user_access', //the function that chack if the user has access. (can be TRUE)
+	'access arguments' => array('manage question'), // the perm of the access function
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['admin/settings/faze_quiz/manage']=array(  //the url of the page
+    'title' => t('הגדרות כלליות'),
+	'description' => 'Configuration options for the faze_quiz module',
+	'page callback' => 'faze_quiz_settings', // the name of the function that run
+	'access callback' => 'user_access', //the function that chack if the user has access. (can be TRUE)
+	'access arguments' => array('manage quiz'), // the perm of the access function
+    'type' => MENU_LOCAL_TASK,
+  );
+  $items['admin/settings/faze_quiz/add_test_question']=array(  //the url of the page
+    'title' => 'Faze quiz - add rundom question',
+	'description' => 'add a test question for the quizes',
+	'page callback' => 'faze_quiz_add_rundom_questions', // the name of the function that run
+	'access callback' => 'user_access', //the function that chack if the user has access. (can be TRUE)
+	'access arguments' => array('administer site configuration'), // the perm of the access function
+  );
+  $items['quiz/add']=array(  //the url of the page
+    'title' => t('יצירת מבחן חדש'),
+	'description' => 'add a new quiz form',
+	'page callback' => 'faze_quiz_addquiz_page', // the name of the function that run
+	'access callback' => 'user_access', //the function that chack if the user has access. (can be TRUE)
+	'access arguments' => array('add quiz'), // the perm of the access function
+  );
+  $items['quiz/%node']=array(  //the url of the page
+    'title' => t('מבחן'),
+	'description' => 'add a new quiz form',
+	'page callback' => 'faze_quiz_quiz_page', // the name of the function that run
+	'page arguments' => array(1),
+	'access callback' => 'faze_quiz_quiz_access', //the function that chack if the user has access. (can be TRUE)
+	'access arguments' => array(1), // the perm of the access function
+  );
+  $items['user/%user/grade'] = array(
+    'title' => 'רמת משתמש',
+    'page callback' => 'quiz_user_page',
+    'page arguments' => array(1),
+	'access callback' => 'user_access',
+	'access arguments' => array('manage question'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => -10,
+  );
+
+  return $items;
+}
+
+/**
+ * Access callback function for quiz/%node menu path
+ */
+function faze_quiz_quiz_access($node){
+  global $user;
+  if ($node->type=="quiz" && $user->uid == $node->uid || $user->uid==1)
+    return TRUE;
+  return FALSE;
+}
+
+function faze_quiz_user($op, &$edit, &$account, $category = NULL){
+  if ($op == "insert"){
+    $n=variable_get('faze_quiz_num_of_initial_tests', 2); //num of quiz for new user.
+    for ($i=0;$i<$n;$i++)
+    {   
+      faze_quiz_addquiz(-1,$account);
+    }
+  }
+}
+
+function faze_quiz_settings(){
+  return drupal_get_form('faze_quiz_settings_form');
+}
+
+function faze_quiz_admin_page(){
+  return drupal_get_form('faze_quiz_admin_page_settings_form');
+}
+
+function faze_quiz_admin_page_settings_form(){
+  $form = array();
+
+  $form['faze_quiz_add_random_question'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('הגדרות מערכת אדפטיבית'),
+    '#collapsible' => FALSE, 
+    '#collapsed' => FALSE,
+  );
+  $form['faze_quiz_add_random_question']['generante_random_test_questions'] = array(
+    '#type' => 'submit',
+    '#value' => t('יצירת שאלות לדוגמא'),
+  );
+
+  return $form;
+}
+
+function faze_quiz_admin_page_settings_form_submit(){
+  faze_quiz_add_rundom_questions();  
+}
+
+function faze_quiz_settings_form(){
+  global $user;
+  global $faze_quiz_question_vid;
+  $form = array();
+  
+  $form['faze_quiz_General'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('הגדרות כלליות'),
+    '#collapsible' => TRUE, 
+    '#collapsed' => TRUE,
+  );
+  
+  $form['faze_quiz_General']['faze_quiz_num_of_new_test'] = array(
+    '#type' => 'textfield',
+	'#title' => t('מספר מבחנים לא פתורים'),
+	'#description' => t('מספר מבחנים לא פתורים שמשתמש יכול ליצור.'),
+	'#default_value' => variable_get('faze_quiz_num_of_new_test', 3),
+	'#required' => TRUE,
+  );
+  
+  $form['faze_quiz_General']['faze_quiz_num_of_initial_tests'] = array(
+    '#type' => 'textfield',
+	'#title' => t('מספר מבחנים התחלתיים'),
+	'#description' => t('מספר מבחנים התחלתיים שנוצרים למשתמש חדש.'),
+	'#default_value' => variable_get('faze_quiz_num_of_initial_tests', 2),
+	'#required' => TRUE,
+  );
+  
+
+  if ($user->uid != 1)
+  {
+    $form['faze_quiz_General']['faze_quiz_num_of_new_test']['#disabled'] = TRUE;
+    $form['faze_quiz_General']['faze_quiz_num_of_initial_tests']['#disabled'] = TRUE;
+  }
+  
+  $form['faze_quiz_num_question_quiz'] = array(
+    '#type' => 'fieldset',
+	'#title' => t('הגדרות כמות שאלות במבחן'),
+    '#description' => t('הגדר כמות שאלות במבחן לכל נושאים'),
+    '#collapsible' => TRUE, 
+    '#collapsed' => TRUE,
+  );
+  foreach (taxonomy_get_tree($faze_quiz_question_vid) as $value)
+  {
+    $form['faze_quiz_num_question_quiz']['faze_quiz_num_question_quiz_'.$value->tid] = array(
+      '#type' => 'textfield',
+	  '#title' => $value->name,
+	  '#default_value' => faze_quiz_get_num_question_in_quiz($value->tid),
+	  '#required' => TRUE,
+    );
+  }
+  $form['faze_quiz_num_question_quiz']['faze_quiz_num_question_quiz_-1'] = array(
+    '#type' => 'textfield',
+	'#title' => t('מבחן כללי'),
+	'#default_value' => faze_quiz_get_num_question_in_quiz(-1),
+	'#required' => TRUE,
+  );
+  
+  $form['faze_quiz_user_level'] = array(
+    '#type' => 'fieldset',
+	'#title' => t('הגדרות חישוב רמת משתמש'),
+    '#collapsible' => TRUE, 
+    '#collapsed' => TRUE,
+  );
+  
+  $form['faze_quiz_user_level']['faze_quiz_user_level_num_calculate_quiz'] = array(
+    '#type' => 'textfield',
+	'#title' => t('מספר מבחנים לחישוב ציון'),
+	'#description' => t('מספר מבחנים אחרונים שמשתמשים בהם לצורך חישוב ציון המשתמש.'),
+	'#default_value' => variable_get('faze_quiz_user_level_num_calculate_quiz', 20),
+	'#required' => TRUE,
+  );
+  
+  $form['faze_quiz_user_level']['faze_quiz_user_level_time_w'] = array(
+    '#type' => 'textfield',
+	'#title' => t('משקל הזמן'),
+	'#description' => t('משקל זמן פתרון הבעיה בחישוב רמת המשתמש.'),
+	'#default_value' => variable_get('faze_quiz_user_level_time_w', 0.7),
+	'#required' => TRUE,
+  );
+  
+  $form['faze_quiz_user_level']['faze_quiz_gauss_s'] = array(
+    '#type' => 'textfield',
+	'#title' => t('סטיית התקן לרמת קושי בהגרלת שאלה חדשה'),
+	'#description' => t('ככל שהערך יותר גדול יהיו שאלות יותר רחוקות מרמת המשתמש.'),
+	'#default_value' => variable_get('faze_quiz_gauss_s', 0.2),
+	'#required' => TRUE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+	'#value' => t('שמירת הגדרות'),
+  );
+  
+  return $form;
+}
+
+function faze_quiz_settings_form_validate(&$form, &$form_state){
+  global $faze_quiz_question_vid;
+  if (!is_numeric($form_state['values']['faze_quiz_num_of_new_test']) || $form_state['values']['faze_quiz_num_of_new_test']<0)
+    form_set_error('faze_quiz_num_of_new_test', t('מספר מבחנים לא פתורים - חובה להזין מספר טבעי.'));
+  if (!is_numeric($form_state['values']['faze_quiz_num_of_initial_tests']) || $form_state['values']['faze_quiz_num_of_ןnitial_tests']<0)
+    form_set_error('faze_quiz_num_of_initial_tests', t('מספר מבחנים התחלתיים - חובה להזין מספר טבעי.'));
+  if (!is_numeric($form_state['values']['faze_quiz_user_level_num_calculate_quiz']) || $form_state['values']['faze_quiz_user_level_num_calculate_quiz']<=0)
+    form_set_error('faze_quiz_user_level_num_calculate_quiz', t('מספר מבחנים לחישוב ציון - חובה להזין מספר טבעי.'));
+  if (!is_numeric($form_state['values']['faze_quiz_user_level_time_w']) || $form_state['values']['faze_quiz_user_level_time_w']<0 || $form_state['values']['faze_quiz_user_level_time_w']>1)
+    form_set_error('faze_quiz_user_level_time_w', t('משקל הזמן - חובה להזין מספר בין 0 ל-1.'));
+  if (!is_numeric($form_state['values']['faze_quiz_gauss_s']) || $form_state['values']['faze_quiz_gauss_s']<0 || $form_state['values']['faze_quiz_gauss_s']>1)
+    form_set_error('faze_quiz_gauss_s', t('סטיית התקן - חובה להזין מספר בין 0 ל-1.'));
+  foreach (taxonomy_get_tree($faze_quiz_question_vid) as $value){
+    if (!is_numeric($form_state['values']['faze_quiz_num_question_quiz_'.$value->tid]) || $form_state['values']['faze_quiz_num_question_quiz_'.$value->tid]<0)
+      form_set_error('faze_quiz_num_question_quiz_'.$value->tid, t('כמות שאלות בנושא '.$value->name.' - חובה להזין מספר שלם.'));
+  }
+  if (!is_numeric($form_state['values']['faze_quiz_num_question_quiz_-1']) || $form_state['values']['faze_quiz_num_question_quiz_-1']<0)
+    form_set_error('faze_quiz_num_question_quiz_-1', t('כמות שאלות בנושא מבחן כללי - חובה להזין מספר שלם.'));
+}
+
+function faze_quiz_settings_form_submit(&$form, &$form_state){
+  variable_set('faze_quiz_num_of_new_test', $form_state['values']['faze_quiz_num_of_new_test']);
+  variable_set('faze_quiz_num_of_initial_tests', $form_state['values']['faze_quiz_num_of_initial_tests']);
+  variable_set('faze_quiz_user_level_num_calculate_quiz', $form_state['values']['faze_quiz_user_level_num_calculate_quiz']);
+  variable_set('faze_quiz_user_level_time_w', $form_state['values']['faze_quiz_user_level_time_w']);
+  variable_set('faze_quiz_gauss_s', $form_state['values']['faze_quiz_gauss_s']);
+  
+  global $faze_quiz_question_vid;
+  foreach (taxonomy_get_tree($faze_quiz_question_vid) as $value){
+    faze_quiz_update_num_question_in_quiz($value->tid,$form_state['values']['faze_quiz_num_question_quiz_'.$value->tid]);
+  }
+  faze_quiz_update_num_question_in_quiz(-1,$form_state['values']['faze_quiz_num_question_quiz_-1']);
+
+  drupal_set_message(t("הנתונים נשמרו"));
+}
+
+function faze_quiz_add_rundom_questions(){
+  for ($i = 1; $i <= 200; $i++) {
+    echo faze_quiz_add_random_question();
+  }
+  return t('add 200 random question');
+}
+
+function faze_quiz_add_random_question(){
+  global $faze_quiz_question_vid;
+  $node = new stdClass();
+
+  $node->type = 'question';
+  $node->uid = '1';
+  $node->field_difficulty[0]['value'] = rand(1, 5)/5;
+  $node->field_correct_answer[0]['value'] = rand(0, 4);
+  $node->field_possible_answers[0]['value'] = 'תשובה א';
+  $node->field_possible_answers[1]['value'] = 'תשובה ב';
+  $node->field_possible_answers[2]['value'] = 'תשובה ג';
+  $node->field_possible_answers[3]['value'] = 'תשובה ד';
+  $node->field_possible_answers[4]['value'] = 'תשובה ה';
+  $node->status = 0;   // Published ? 1 : 0
+  $node->language = 'he';
+  $node->field_explanation[0]['value'] = "הסבר השאלה";
+  $node->field_count_correct_ans[0]['value'] = 0;
+  $node->field_count_time_asked[0]['value'] = 0;
+  $node->field_avrg_time_ans[0]['value'] = 0;
+  node_save($node);
+
+  $taxonomy_terms = taxonomy_get_tree($faze_quiz_question_vid);
+  $term = $taxonomy_terms[rand(0, count($taxonomy_terms)-1)];
+  taxonomy_node_save($node, array($term));
+
+  //the nid is valid only after we save the node.
+  $node->field_question[0]['value'] = "זו שאלה לדוגמה " . $node->nid . " מסוג " . $term->name . " ובדרגת קושי " . $node->field_difficulty[0]['value'] . "";
+  //$node->field_question[0]['value'] .="<br/> תשובה נכונה: " . ($node->field_correct_answer[0]['value']+1);
+  $node->title = $node->nid;
+  node_save($node);
+
+  drupal_set_message(t("נוצר: " . $node->field_question[0]['value']));
+}
+
+function faze_quiz_addquiz_page(){
+  return drupal_get_form('faze_quiz_addquiz_form');
+}
+
+
+function faze_quiz_addquiz_form(){
+  global $faze_quiz_question_vid;
+  $form = array();
+
+  $all_term=array();
+  foreach (taxonomy_get_tree($faze_quiz_question_vid) as $value)
+  {
+    $all_term[$value->tid]=$value->name;
+  }
+  $all_term[-1]=t('מבחן כללי');
+
+  $form['addquiz_term'] = array(
+    '#type' => 'radios',
+	'#title' => t('נושא מבחן'),
+	'#description' => t('אנא בחר נושא.'),
+	'#options' => $all_term , 
+	'#required' => TRUE,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+	'#value' => t('בצע'),
+  );
+
+  return $form;
+}
+
+function faze_quiz_addquiz_form_submit(&$form, &$form_state){
+  global $user;
+  $result = db_query("SELECT count(node.nid) AS new_quiz
+    FROM node node 
+    LEFT JOIN content_type_quiz node_data_field_completed ON node.vid = node_data_field_completed.vid
+    INNER JOIN users users ON node.uid = users.uid
+    WHERE (node.type in ('quiz')) AND (node_data_field_completed.field_completed_value = 0) AND (users.uid = %d)" 
+    , $user->uid);
+  $row = db_fetch_object($result);
+  if ($row->new_quiz>=variable_get('faze_quiz_num_of_new_test', 3))
+  {
+    drupal_set_message(t("לא ניתן ליצור מבחנים נוספים. יש לפתור מבחנים קיימים."));
+    drupal_goto("מאגר-שאלות");
+  }    
+  else 
+  {
+    $nid=faze_quiz_addquiz($form_state['values']['addquiz_term']);
+    drupal_goto("quiz/".$nid);
+  }
+}
+
+
+// add a new quiz with question.
+// tid - term id. (-1=all)
+// return nid
+function faze_quiz_addquiz($tid = -1, $account = null){
+  global $faze_quiz_question_vid;
+  $num_question=faze_quiz_get_num_question_in_quiz($tid);
+  $num_of_question_in_taxonomy=array();
+  foreach (taxonomy_get_tree($faze_quiz_question_vid) as $value){
+    $num_of_question_in_taxonomy[$value->tid]=0;
+  }
+  if ($tid==-1)
+  {
+    $num_of_question_in_taxonomy[1]=$num_question/4; //נושא 1
+    $num_of_question_in_taxonomy[2]=$num_question/4; //נושא 2
+    $num_of_question_in_taxonomy[3]=$num_question/4; //נושא 3
+    $num_of_question_in_taxonomy[4]=$num_question/4; //נושא 4
+    $node->title = t("מבחן כללי");   
+  }
+  else
+  {
+    $num_of_question_in_taxonomy[$tid]=$num_question;
+    $node->title = taxonomy_get_term($tid)->name;
+  }
+  
+  $select_questions=array();
+  $questions=array();
+  foreach (taxonomy_get_tree($faze_quiz_question_vid) as $value){
+    $user_leval=faze_quiz_get_user_level_in_taxonomy($account,$value->tid);
+    while ($num_of_question_in_taxonomy[$value->tid]>0){
+      $question=faze_quiz_get_rund_question($value->tid,$user_leval,$select_questions);
+      if (!$question) // there is no more question for this taxonomy
+        break;
+      $select_questions[]=$question->nid;
+      $questions[]=$question;
+      $num_of_question_in_taxonomy[$value->tid]--;
+    }
+  }
+  if (count($questions)<$num_question){
+    drupal_set_message(t("שים לב, במערכת אין מספיק שאלות עבור מבחן זה"));
+  }
+  if (count($questions)==0){
+    return null;
+  }
+  return faze_quiz_build_quiz($questions, $account);
+}
+
+
+// add a new quiz with question.
+// questions - question node array
+// return nid
+function faze_quiz_build_quiz($questions, $account = null){
+
+  $num_question=count($questions);
+  if ($account==null){
+    global $user;
+    $account=$user;
+  }
+
+  $node = new stdClass();
+  $node->type = 'quiz';
+  $node->uid = $account->uid;
+  $node->field_completed[0]['value'] = 0;
+  for($i=0;$i<$num_question;$i++)
+    $node->field_answers[$i]['value'] = -99; //null
+  for($i=0;$i<$num_question;$i++)
+    $node->field_time[$i]['value'] = 0;
+  $node->field_count_correct[0]['value'] = 0;
+  $node->field_is_scanned[0]['value'] = 0;
+  $node->status = 0;   // Published ? 1 : 0
+  $node->language = 'he';
+  
+  $i=0;
+  $count_difficulty=0;
+  foreach($questions as $question)
+  {
+    $count_difficulty+= $question->field_difficulty[0]['value'];
+    $node->field_questions[$i]['value'] = $question->nid;
+    $i++;
+  }
+  if ($i>0){
+    shuffle($node->field_questions); // make random
+    $node->field_difficulty[0]['value']=$count_difficulty/$i;
+  }
+  
+
+  node_save($node);
+  return $node->nid;
+}
+
+
+function faze_quiz_get_rund_question($tid,$user_leval,$exclud_qid=array()){
+  array_push($exclud_qid,0);
+  module_load_include('inc', 'faze_quiz', 'normal_dist');
+  $s=variable_get('faze_quiz_gauss_s', 0.2);
+  $difficulty=faze_quiz_gauss_ms($user_leval,$s);
+  $result = db_query("
+    SELECT node.nid AS nid,
+    node_data_field_difficulty.field_difficulty_value AS difficulty
+    FROM node node 
+    INNER JOIN term_node term_node ON node.vid = term_node.vid
+    LEFT JOIN content_field_difficulty node_data_field_difficulty ON node.vid = node_data_field_difficulty.vid
+    WHERE (term_node.tid = %d) AND (node.type in ('question')) AND (node.status = 0)
+    AND node.nid NOT IN (".db_placeholders($exclud_qid, 'int').")
+    ORDER BY ABS(node_data_field_difficulty.field_difficulty_value-%f), RAND() ASC
+    LIMIT 1" 
+    , array_merge(array($tid) , $exclud_qid , array($difficulty)));
+  $row = db_fetch_object($result);
+  return node_load($row->nid);
+}
+
+function faze_quiz_get_user_level_in_taxonomy($account,$tid){
+  $result = db_query("SELECT level 
+  					 FROM faze_quiz_user_level 
+  					 WHERE uid=%d AND tid=%d"
+  					 ,$account->uid,$tid);
+  $row = db_fetch_object($result);
+  if ($row)
+    return $row->level;
+  return 0.5;
+}
+
+/**
+ * Page callback function for quiz/%node menu path
+ */
+function faze_quiz_quiz_page($quiz_node) {
+  //drupal_set_message('מספר מבחן:' . $node->nid . ' מסוג: ' . $node->title);
+  if ($quiz_node->field_completed[0]['value'] == 0){
+    drupal_add_js(drupal_get_path('module', 'faze_quiz') . '/step_by_step.js', 'module', 'header');
+    drupal_add_js(drupal_get_path('module', 'faze_quiz') . '/init_quiz.js', 'module', 'footer');
+    drupal_add_css(drupal_get_path('module', 'faze_quiz') .'/theme/sbs.css');
+    return drupal_get_form('faze_quiz_quiz_form', $quiz_node);
+  }
+  return theme('faze_quiz_completed', $quiz_node);
+}
+
+function faze_quiz_quiz_form($record,$quiz_node=NULL){
+  $form = array();
+
+  for ($i=0; $i<count($quiz_node->field_questions) && $quiz_node->field_questions[$i][value]>0;$i++){
+    $question_node=node_load($quiz_node->field_questions[$i][value], NULL, TRUE);
+    $form['question_'.$question_node->nid] = array(
+      '#type' => 'fieldset', 
+      '#title' => ($i+1).'/'.count($quiz_node->field_questions), 
+      '#description' => $question_node->field_question[0][value], 
+      '#weight' => $i, 
+      //'#collapsible' => TRUE, 
+      //'#collapsed' => TRUE,
+      '#attributes' => array('class' => 'fieldset_question', 'id' => 'fieldset_question_'.$i),
+    );
+    
+    if ($question_node->field_quiz_image[0]!= null)
+    {
+      $form['question_'.$question_node->nid]['#description'].="<br /><img src='/".$question_node->field_quiz_image[0]['filepath']."'/>";
+    }
+    $form['question_'.$question_node->nid]['answer_'.$question_node->nid] = array(
+      '#type' => 'radios',
+	  '#options' => array() , 
+	  '#required' => FALSE,
+	  '#default_value' => $quiz_node->field_answers[$i][value],
+    );
+    foreach ($question_node->field_possible_answers  as $key => $value)
+      $form['question_'.$question_node->nid]['answer_'.$question_node->nid]['#options'][$key]=$value[value];
+    $form['question_'.$question_node->nid]['answer_'.$question_node->nid]['#options'][-1]=t("לא יודע");
+    $form['question_'.$question_node->nid]['time_'.$question_node->nid] = array(
+      '#type' => 'hidden' ,
+      '#title' => 'time', 
+	  '#default_value' => $quiz_node->field_time[$i][value] ,
+      '#attributes' => array('class' => 'fieldset_time'),
+    );
+  }
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#weight' => -1, 
+	'#value' => t('סיים משימה'),
+  );
+  return $form;
+}
+
+function faze_quiz_quiz_form_submit(&$form, &$form_state){
+  $quiz_node=$form['#parameters'][2];
+  $complete=1;
+  $correct_answers=0;
+  for ($i=0; $i<sizeof($quiz_node->field_questions) ;$i++){
+    $question_node=node_load($quiz_node->field_questions[$i][value], NULL, TRUE);
+    $select_value=$form_state['values']['answer_'.$question_node->nid];
+    $quiz_node->field_time[$i][value] = $form_state['values']['time_'.$question_node->nid];
+    if($select_value>=-1) // if the user select answers for this question
+    {
+      $quiz_node->field_answers[$i]['value'] = $select_value;
+      //dsm(array('qID' => $question_node->nid , "val" =>  $select_value));
+    }
+    else if ($quiz_node->field_answers[$i]['value']>=-1){ // if there is saved answer in the quiz node.
+    
+    }
+    else $complete=0;
+    
+    if ($quiz_node->field_answers[$i]['value']==$question_node->field_correct_answer[0]['value']) 
+      $correct_answers++;
+  }
+  $quiz_node->field_grade[0]['value']=0;
+  if (sizeof($quiz_node->field_questions)>0)
+    $quiz_node->field_grade[0]['value']=$correct_answers/sizeof($quiz_node->field_questions);
+    
+  $quiz_node->field_completed[0]['value'] = $complete;
+  $quiz_node->field_count_correct[0]['value'] = $correct_answers;
+  node_save($quiz_node);
+  
+  global $user;
+  faze_quiz_calc_user_level($user);
+}
+
+/**
+ * Example implemention of hook_theme().
+ *
+ * hook_theme is required to register our themeable (overrideable) output
+ * with drupal's theme system.
+ */
+function faze_quiz_theme(){
+  $path = drupal_get_path('module', 'faze_quiz') . '/theme';
+  
+  return array (
+  	'faze_quiz_completed' => array (
+      'arguments' => array('quiz_node' => NULL),
+	  'template' => 'faze_quiz_completed',
+	  'path' => $path,
+	),
+  	'faze_quiz_completed_question' => array (
+  	  'arguments' => array('quiz_node' => NULL, 'question_i' => NULL),
+	  'template' => 'faze_quiz_completed_question',
+	  'path' => $path,
+	),
+	'quiz_user' => array(
+      'arguments' => array('grade' => NULL),
+    )
+  );
+}
+
+function get_difficulty_int($difficulty_float) {
+  return floor($difficulty_float*4.999999)+1;
+  /*
+   * [0-0.2] -> 1
+   * (0.2-0.4] -> 2
+   * (0.4-0.6] -> 3
+   * (0.6-0.8] -> 4
+   * (0.8-1] -> 5
+   */
+}
+
+function get_difficulty_str($difficulty_float) {
+  $difficultyArr = array(
+  1  =>  "קלה מאוד",
+  2  =>  "קלה",
+  3  =>  "בינונית",
+  4  =>  "קשה",
+  5  =>  "קשה מאוד",
+  );
+  return $difficultyArr[get_difficulty_int($difficulty_float)];
+}
+
+function faze_quiz_cronapi($op, $job = NULL) {
+  $items['faze_quiz_scann_quiz'] = array(
+    'description' => 'update the question difficulty',
+    'rule' => '*/1 * * * *', // Every 1 minutes
+  );
+  return $items;
+  print "11";
+}
+
+//update the question difficulty
+function faze_quiz_scann_quiz() {
+  $result = db_query("SELECT node.nid AS nid
+                     FROM node node 
+                     LEFT JOIN content_type_quiz node_data_field_completed ON node.vid = node_data_field_completed.vid
+                     WHERE (node.type in ('quiz')) 
+                     AND (node_data_field_completed.field_completed_value = 1) 
+                     AND (node_data_field_completed.field_is_scanned_value = 0)");
+  
+  while ($row = db_fetch_object($result)){
+    //echo $row->nid."<br/>";
+    $quiz_node=node_load($row->nid,null,true);
+    for ($i=0; $i<count($quiz_node->field_questions) && $quiz_node->field_questions[$i]['value']>0;$i++){
+      $question_node=node_load($quiz_node->field_questions[$i]['value'],null,true);
+      $old_correct_ans = $question_node->field_count_correct_ans[0]['value'];
+      $old_count_time_asked = $question_node->field_count_time_asked[0]['value'];
+      $old_avrg_time_ans = $question_node->field_avrg_time_ans[0]['value'];
+      if ($quiz_node->field_answers[$i]['value']== $question_node->field_correct_answer[0]['value'])
+        $question_node->field_count_correct_ans[0]['value']=$old_correct_ans+1;
+      $question_node->field_count_time_asked[0]['value']=$old_count_time_asked+1;
+      $question_node->field_avrg_time_ans[0]['value']=($old_avrg_time_ans*$old_count_time_asked+$quiz_node->field_time[$i]['value'])/($old_count_time_asked+1);
+      $question_node->field_difficulty[0]['value']=1-$question_node->field_count_correct_ans[0]['value']/$question_node->field_count_time_asked[0]['value'];
+      node_save($question_node);
+    }
+    $quiz_node->field_is_scanned[0]['value']=1;
+    node_save($quiz_node);
+  }
+}
+
+function faze_quiz_calc_user_level($user){
+  global $faze_quiz_question_vid;
+  $num_calculate_quiz=variable_get('faze_quiz_user_level_num_calculate_quiz', 20);
+  foreach (taxonomy_get_tree($faze_quiz_question_vid) as $value){ //each taxonomy
+    for ($i=1; $i<=$num_calculate_quiz;$i++ )
+    {
+      $quiz_grade[$i][$value->tid]["num_of_question"]=0;  //num of question in taxonomy in quiz
+      $quiz_grade[$i][$value->tid]["sum_grade"]=0;  // sum grade of question in taxonomy in quiz
+      $quiz_grade[$i][$value->tid]["avr_grade"]=0;  // avrge grade of question in taxonomy in quiz
+    }
+    $level[$value->tid]["sum"]=0;
+    $level[$value->tid]["final"]=0;
+  }
+  $result = db_query("SELECT node.nid AS nid
+                      FROM node node 
+                      INNER JOIN content_type_quiz node_data_field_completed ON node.vid = node_data_field_completed.vid
+                      WHERE (node.uid = %d) AND (node.type in ('quiz')) AND (node_data_field_completed.field_completed_value = 1)
+                      ORDER BY node.changed DESC LIMIT 0 , %d",$user->uid,$num_calculate_quiz);
+  $quiz_index=$num_calculate_quiz;
+  $sum_quiz_index=0;
+  while ($row = db_fetch_object($result)){
+    //the last n quiz of the user.
+    $quiz_node=node_load($row->nid,null,true);
+    for ($i=0; $i<20 ;$i++){
+      
+      //each question in the quiz.
+      $question_node=node_load($quiz_node->field_questions[$i]['value'],null,true);
+      if ($question_node==null)
+        continue;
+      $is_correct=($quiz_node->field_answers[$i]['value'] == $question_node->field_correct_answer[0]['value']);
+      if ($question_node->field_avrg_time_ans[0]['value']==0)
+        $question_node->field_avrg_time_ans[0]['value']=0.001; //for nod div in 0.
+      $t=$quiz_node->field_time[$i]['value']/$question_node->field_avrg_time_ans[0]['value'];
+      $w=variable_get('faze_quiz_user_level_time_w', 0.7);
+      
+      $tid=end($question_node->taxonomy)->tid;
+      
+      $quiz_grade[$quiz_index][$tid]["num_of_question"]++;
+      
+      if(!$is_correct)
+        $quiz_grade[$quiz_index][$tid]["sum_grade"]+=0;
+      elseif ($t>=4)
+        $quiz_grade[$quiz_index][$tid]["sum_grade"]+=(1-$w);
+      else 
+        $quiz_grade[$quiz_index][$tid]["sum_grade"]+=(1-($w/4)*$t);
+      
+      $quiz_grade[$quiz_index][$tid]["avr_grade"]=$quiz_grade[$quiz_index][$tid]["sum_grade"]/$quiz_grade[$quiz_index][$tid]["num_of_question"];
+    } // end for question in quiz
+    
+    $sum_quiz_index+=$quiz_index;
+    foreach (taxonomy_get_tree($faze_quiz_question_vid) as $value){ //each taxonomy
+      $level[$value->tid]["sum"]+=$quiz_grade[$quiz_index][$value->tid]["avr_grade"]*$quiz_index;
+      $level[$value->tid]["final"]=$level[$value->tid]["sum"]/$sum_quiz_index;
+    }
+    $quiz_index--;
+  } // end for quiz
+  
+  
+  //dsm($level);
+  //dsm($quiz_grade);
+  
+  
+  foreach (taxonomy_get_tree($faze_quiz_question_vid) as $value){
+    $result = db_query("INSERT INTO faze_quiz_user_level (uid,tid,level) VALUES (%d,%d,%f)
+  						ON DUPLICATE KEY UPDATE level=%f;"
+                        ,$user->uid,$value->tid,$level[$value->tid]["final"],$level[$value->tid]["final"] );
+  }
+  
+}
+
+function quiz_user_page($account) {
+  global $faze_quiz_question_vid;
+  $grade=array();
+  foreach (taxonomy_get_tree($faze_quiz_question_vid) as $value)
+  {
+    $grade[$value->name]=faze_quiz_get_user_level_in_taxonomy($account,$value->tid);
+  }
+  return theme('quiz_user', $grade);
+}
+
+function theme_quiz_user($grade) {
+  $str='<ul>';
+  foreach ($grade as $key => $value){
+    $str.="<li><span style='font-weight:bold; float:right;'>".$key."</span>:\t".$value."</li>";
+  }
+  $str.='</ul>';
+  return $str;  
+}
+
+function faze_quiz_get_num_question_in_quiz($tid){
+  $result = db_query("SELECT num_question 
+  					 FROM faze_quiz_num_question_quiz 
+  					 WHERE tid=%d"
+  					 ,$tid);
+  $row = db_fetch_object($result);
+  if ($row)
+    return $row->num_question;
+  global $faze_quiz_defult_num_question;
+  return $faze_quiz_defult_num_question;
+}
+
+function faze_quiz_update_num_question_in_quiz($tid,$num_of_question){
+  $result = db_query("INSERT INTO faze_quiz_num_question_quiz (tid,num_question) VALUES (%d,%d)
+  					  ON DUPLICATE KEY UPDATE num_question=%d;"
+                      ,$tid,$num_of_question,$num_of_question);
+}
+
+function faze_quiz_get_question_subject_array_with_depth(){
+  global $faze_quiz_question_vid;
+  return faze_quiz_get_texonomy_array_with_depth($faze_quiz_question_vid);
+}
+
+function faze_quiz_get_texonomy_array_with_depth($vid,$parent=0,$begining=""){
+  $first_leval=taxonomy_get_tree($vid,$parent,-1,1);
+  $ans=array();
+  foreach ($first_leval as $term){
+    $ans[$term->tid]=$begining.$term->name;
+    $ans+=faze_quiz_get_texonomy_array_with_depth($vid,$term->tid,$begining."--");
+  }
+  return $ans;
+}
+
+function faze_quiz_get_question_subject_multi_array(){
+  global $faze_quiz_question_vid;
+  return faze_quiz_get_texonomy_multi_array($faze_quiz_question_vid);
+}
+
+function faze_quiz_get_texonomy_multi_array($vid,$parent=0){
+  $first_leval=taxonomy_get_tree($vid,$parent,-1,1);
+  $ans= array();
+  foreach ($first_leval as $term){
+    $ans[$term->tid]=new stdclass();
+    $ans[$term->tid]->tid = $term->tid;
+    $ans[$term->tid]->name = $term->name;
+    $ans[$term->tid]->child = faze_quiz_get_texonomy_multi_array($vid,$term->tid);
+  }
+  return $ans;
+}

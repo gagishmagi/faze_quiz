@@ -1,0 +1,133 @@
+<?php
+// $id$
+
+/**
+ * @file
+ * Install file for faze_quiz_course module
+ */
+
+
+/**
+ *  Implementation of hook_install().
+ *
+ * Perform initial setup tasks.
+ */
+function faze_quiz_course_install(){
+  drupal_install_schema('faze_quiz_course');
+}
+
+/**
+ *  Implementation of hook_uninstall().
+ *
+ * Perform final clean-up tasks.
+ */
+function faze_quiz_course_uninstall(){
+  drupal_uninstall_schema('faze_quiz_course');
+}
+
+function faze_quiz_course_schema() {
+  $schema = array();
+  $schema['faze_quiz_course_course'] = array(
+    'description' => t('save the courses '),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('The course id'),
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'description' => t('the name of the course.'),
+        'type' => 'varchar', 
+        'length' => 32, 
+        'not null' => TRUE, 
+        'default' => '',
+      ),
+      'teacher_uid' => array(
+        'description' => t('the teacher.uid of the course '),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('cid'),
+  );
+  
+  $schema['faze_quiz_course_course_subject'] = array(
+    'description' => t('list of course subject'),
+    'fields' => array(
+      'sid' => array(
+        'description' => t('The subject id'),
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'cid' => array(
+        'description' => t('the course id'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'name' => array(
+        'description' => t('the name of the subject.'),
+        'type' => 'varchar', 
+        'length' => 32, 
+        'not null' => TRUE, 
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('sid'),
+  );
+  
+  $schema['faze_quiz_course_question_subject'] = array(
+    'description' => t('list of course subject'),
+    'fields' => array(
+      'qid' => array(
+        'description' => t('the nid of question node'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'sid' => array(
+        'description' => t('the subject id'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('qid','sid'),
+  );
+
+  $schema['faze_quiz_course_course_student'] = array(
+    'description' => t('list of course student'),
+    'fields' => array(
+      'cid' => array(
+        'description' => t('the course id'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'uid' => array(
+        'description' => t('the student uid'),
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'level' => array(
+        'description' => t('the level of the student in this corse'),
+        'type' => 'float',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0.5,
+      ),
+    ),
+    'primary key' => array('cid','uid'),
+  );
+  return $schema;
+}

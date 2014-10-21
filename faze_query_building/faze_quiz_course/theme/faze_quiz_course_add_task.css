@@ -1,0 +1,16 @@
+div.ui-dialog{
+  font-size: 0.7em;
+}
+
+#addQuestionBox span.existQuestion{
+	color: #00FF00;
+	font-weight:bold;
+}
+
+#FixedQuestion_table a.removeQuestion{
+	/*display: block;*/
+}
+
+#FixedQuestion_table .short_question{
+	display: block;
+}

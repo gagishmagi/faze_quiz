@@ -1,0 +1,214 @@
+<?php
+
+
+function faze_query_building_filter($data) {
+  global $_GET;
+  $thead = '<form id="query_building-filter" name="filter" method="get" action=""><table border="0" cellspacing="5px" cellpadding="0"><tr>';
+  $tbody = '<tr>';
+  $sql = '(';
+
+  $count_out = 0;
+  $count_search = 0;
+  $search_query = '((';
+  $search_text = addslashes($_GET['filter_search']);
+  foreach ($data as $entry) {
+    if ($entry['options']) {
+      $thead .= '<th>' . $entry['name'] . '</th>';
+      $field = 'filter_'. $entry['table'] .'_'. $entry['column'];
+      $tbody .= '<td><select name="'. $field .'[]" size="'. min(sizeof($entry['options']), 5) .'" multiple>' . "\n";
+      $checked = array();
+
+      if (!isset($_GET[$field])) {
+        // no value has bben selected: force selection of default value.
+        $_GET[$field][0] = $entry['default'];
+      }
+
+      if ($count_out > 0) {
+        $sql .= ' AND (';
+      } else {
+        $sql .= '(';
+      }
+      $count_in = 0;
+      foreach ($_GET[$field] as $sel_val) {
+        $checked[$field][$sel_val] = ' selected';
+        if ($count_in > 0) {
+          $sql .= ' OR ';
+        }
+        if ($sel_val == '-1' || $sel_val =='') {
+          // -1 means all values, thus, make it a wildcard
+          //$sel_val = '';
+          $sql.='TRUE';
+          break;
+        }
+        //$sql .= '`'. $entry['table'] .'`.`'. $entry['column'] ."` LIKE '%". $sel_val ."%'";
+        $sql .= '`'. $entry['table'] .'`.`'. $entry['column'] ."`";
+        if ($entry['type']=='numeric')
+          $sql .= " = '". $sel_val ."'";
+        else
+          $sql .= " LIKE '%". $sel_val ."%'";
+        $count_in++;
+      }
+      $count_out++;
+      $sql .= ')';
+
+      /*
+      foreach ($entry['options'] as $val => $text) {
+        $tbody .= '<option value="'. $val .'"'. $checked[$field][$val] .'>'. $text .'</option>' . "\n";
+      }
+      */
+      
+      $tbody.=faze_query_building_option_html($entry['options'],$checked,$field);
+
+      $tbody .= '</td>' . "\n";
+    }
+    if (!($entry['type']=='numeric' && $entry['options'])){
+      if ($count_search > 0) {
+        $search_query .= ') OR (';
+      }
+      //$search_query .= '`'. $entry['table'] .'`.`'. $entry['column'] ."` LIKE '%%". $search_text ."%'";
+      $search_query .= '`'. $entry['table'] .'`.`'. $entry['column']."`";
+      if ($entry['type']=='numeric')
+        $search_query .= " = '". $search_text ."'";
+      else
+        $search_query .= " LIKE '%%". $search_text ."%'";
+      $count_search++;
+    }
+
+  }
+
+
+  $thead .= '<th></th></tr>';
+  $tbody .= '<td><div>טקסט חופשי:</div><div><input type="text" name="filter_search" value="'.addslashes($search_text).'" /></div><input type="submit" value="סנן" style="margin-top: 10px;" class="form-submit" /></td></tr>';
+  $ret['table'] = $thead . $tbody . '</table></form>';
+
+
+  if ($count_out > 0) {
+    $sql .= ') AND ' . $search_query . '))';
+  } else {
+    $sql = $search_query . '))';
+  }
+  
+  if (strlen($sql) > 2) {
+    $ret['sql'] = $sql;
+  } else {
+    $ret['sql'] = 'TRUE';
+  }
+  //print '<br>'.$ret['sql'].'<br>';
+  //dsm($ret['sql']);
+  return $ret;
+}
+
+function faze_query_building_option_html($options,$checked,$field){
+  $html="";
+  foreach ($options as $key => $val) {
+    if (isset($val->child) && count($val->child)>0){
+      $html .= '<optgroup label="'. $val->name .'">' . "\n";
+      $html .=faze_query_building_option_html($val->child,$checked,$field);
+      $html .= '</optgroup>';
+    }
+    else {
+        if (isset($val->name))
+          $html .= '<option value="'. $key .'"'. $checked[$field][$key] .'>'. $val->name .'</option>' . "\n";
+        else 
+          $html .= '<option value="'. $key .'"'. $checked[$field][$key] .'>'. $val .'</option>' . "\n";
+    }
+  }
+  return $html;
+}
+
+
+
+/* 
+ * example
+ 
+function faze_query_building_menu() {
+  $items = array();
+
+  $items['aaa'] = array(
+    'title' => 'test',
+    'page callback' => 'faze_query_building_test_page',
+    'access callback' => true,
+  );
+  return $items;
+}
+
+function faze_query_building_test_page() {
+  $filter = array(
+    "nid" => array(
+      'table' => 'node',
+      'column' => 'nid',
+    ),
+    "title" => array(
+      'table' => 'node',
+      'column' => 'title',
+    ),
+    "type" => array(
+      'table' => 'node',
+      'column' => 'type',
+      'name' => "content type",
+      'default' => '',
+      'options' => array(
+        ''  => 'all',
+        'page' => 'page',
+        'story	' => 'story',
+    )),
+    "user" => array(
+      'table' => 'users',
+      'column' => 'uid',
+      'name' => "user",
+      'default' => '',
+      'options' => array(
+        ''  => 'all',
+        '0' => 'anonymous',
+        '1' => 'admin',
+    )),
+  );  
+
+  
+  $filter_obj = faze_query_building_filter($filter);
+  dsm($filter_obj);
+
+  $headers = array(
+    array('data' => '#', 'field' => 'nid', 'sort'=> 'desc'),
+    array('data' => 'title', 'field' => 'title'),
+    array('data' => 'user', 'field' => 'uname'),
+    array('data' => 'action'),
+  );
+
+  $sql = "SELECT
+      `node`.`nid` as nid,
+      `node`.`title` as title,
+      `users`.`name` as uname
+
+    FROM `node` JOIN `users` ON `node`.`uid`=`users`.`uid`";
+  $sql .= " WHERE ".$filter_obj['sql'];
+  $sql .= tablesort_sql($headers);
+  $limit = 50;
+
+
+  $result = pager_query($sql, $limit, 0, NULL);
+  if($result){
+    $data = array();
+    $i = 1;
+    //your basic while loop to get the data
+    while($row = db_fetch_array($result)) {
+      $data[$i]['nid'] = $row['nid'];
+      $data[$i]['title'] = $row['title'];
+      $data[$i]['user'] = $row['uname'];
+      $data[$i]['buttons'] = "<button type=\"button\">button</button>";
+      $i++;
+    }
+    
+    if ($data) {
+      $output = $filter_obj['table'];
+      $output .= theme( 'table', $headers, $data );
+      $output .= theme('pager', NULL, $limit, 0);
+    } else {
+      $output = '<div>No requests found</div>';
+    }
+  }
+
+  return $output;
+}
+
+*/
